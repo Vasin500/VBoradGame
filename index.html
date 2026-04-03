@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>บอร์ดเกมOnline</title>
+<title>ป็อกเด้ง Online</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script type="module">
@@ -248,15 +248,19 @@ function renderGameState(room) {
 
   document.getElementById('roundBadge').textContent    = `รอบที่ ${round}`;
   document.getElementById('deckCountLabel').textContent = `ไพ่เหลือ ${deck.length}`;
-  renderMyHand(myHand);
-  renderOpponents(players, hands, stood, order, bankerIdx);
 
-  // ── รอบใหม่เริ่มแล้ว → ซ่อน overlay และ reset flags ทุกคน
+  const stoodCount = order.filter(id => stood[id]).length;
+  const allStood   = stoodCount === order.length;
+
+  // รอบใหม่เริ่มแล้ว → ซ่อน overlay และ reset flags ทุกคน
   if (status === 'playing') {
     document.getElementById('resultOverlay').classList.remove('show');
     resolving    = false;
     pokAutoStood = false;
   }
+
+  renderMyHand(myHand);
+  renderOpponents(players, hands, stood, order, bankerIdx, allStood);
 
   if (status === 'roundover') {
     setButtons(false, false);
@@ -267,21 +271,26 @@ function renderGameState(room) {
     return;
   }
 
-  // Active game
+  // Active game — update stand button label
+  const standLabel = document.getElementById('btnStand');
+
   if (myStood) {
     setButtons(false, false);
-    // Count how many still playing
-    const waiting = order.filter(id => !stood[id]).length;
-    setStatus(waiting > 0 ? `✅ พอแล้ว — รออีก ${waiting} คน...` : '⏳ กำลังตัดสินผล...');
+    setStatus(`✅ พร้อมแล้ว ${stoodCount}/${order.length} — รออีก ${order.length - stoodCount} คน...`);
   } else {
-    if (isPok(myHand) && !pokAutoStood) {
-      pokAutoStood = true;
-      setButtons(false, false);
-      setStatus('🎉 ป็อก! ยืนอัตโนมัติ...');
-      writeStand(room);
-    } else if (!isPok(myHand)) {
-      setButtons(myHand.length < 3, true);
-      setStatus(myHand.length < 3 ? 'เลือก: เพิ่มไพ่ หรือ พอแล้ว' : 'ไพ่ครบ 3 ใบ — กด "พอแล้ว"');
+    // ป็อก: auto-stand ครั้งเดียว ไม่วน loop
+    if (isPok(myHand)) {
+      if (!pokAutoStood) {
+        pokAutoStood = true;
+        setButtons(false, false);
+        setStatus('🎉 ป็อก! ยืนอัตโนมัติ...');
+        writeStand(room);
+      }
+    } else {
+      const canHit = myHand.length < 3;
+      setButtons(canHit, true);
+      if (standLabel) standLabel.textContent = `✋ พร้อม ${stoodCount}/${order.length}`;
+      setStatus(canHit ? 'เลือก: เพิ่มไพ่ หรือ พร้อม' : 'ไพ่ครบ 3 ใบ — กด "พร้อม"');
     }
   }
 }
@@ -293,20 +302,22 @@ function renderMyHand(hand) {
   document.getElementById('myScore').textContent = handScore(hand) + ' แต้ม';
 }
 
-function renderOpponents(players, hands, stood, order, bankerIdx) {
+function renderOpponents(players, hands, stood, order, bankerIdx, allStood) {
   const area = document.getElementById('opponentsArea');
   area.innerHTML = '';
   players.filter(p => p.id !== myId).forEach(p => {
-    const hand    = hands[p.id] || [];
-    const isStood = stood[p.id] || false;
+    const hand     = hands[p.id] || [];
+    const isStood  = stood[p.id] || false;
     const isBanker = order[bankerIdx] === p.id;
     const div = document.createElement('div');
     div.className = 'opponent-hand';
-    const cardsHtml = hand.map((c, i) => cardSmallHTML(isStood || i === 0 ? c : null)).join('');
+    // เปิดไพ่ก็ต่อเมื่อทุกคน stood แล้วเท่านั้น
+    const cardsHtml = hand.map(c => cardSmallHTML(allStood ? c : null)).join('');
+    const scoreText = allStood ? handType(hand) : `${hand.length} ใบ · ??`;
     div.innerHTML = `
-      <div class="opp-name">${p.avatar} ${p.name}${isBanker ? ' 🏦' : ''}</div>
+      <div class="opp-name">${p.avatar} ${p.name}${isBanker ? ' 🏦' : ''}${isStood && !allStood ? ' ✅' : ''}</div>
       <div class="opp-cards">${cardsHtml}</div>
-      <div class="opp-score">${isStood ? handType(hand) : `${hand.length} ใบ · ??`}</div>`;
+      <div class="opp-score">${scoreText}</div>`;
     area.appendChild(div);
   });
 }
@@ -699,7 +710,7 @@ window.addEventListener('load', () => {
       <div class="hand-area" id="myHand"></div>
       <div class="action-row">
         <button class="btn-action btn-hit"   id="btnHit"   onclick="playerHit()"   disabled>🂠 เพิ่มไพ่</button>
-        <button class="btn-action btn-stand" id="btnStand" onclick="playerStand()" disabled>✋ พอแล้ว</button>
+        <button class="btn-action btn-stand" id="btnStand" onclick="playerStand()" disabled>✋ พร้อม</button>
       </div>
     </div>
   </div>
