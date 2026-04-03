@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ป็อกเด้ง Online</title>
+<title>บอร์ดเกมOnline</title>
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script type="module">
@@ -250,6 +250,13 @@ function renderGameState(room) {
   document.getElementById('deckCountLabel').textContent = `ไพ่เหลือ ${deck.length}`;
   renderMyHand(myHand);
   renderOpponents(players, hands, stood, order, bankerIdx);
+
+  // ── รอบใหม่เริ่มแล้ว → ซ่อน overlay และ reset flags ทุกคน
+  if (status === 'playing') {
+    document.getElementById('resultOverlay').classList.remove('show');
+    resolving    = false;
+    pokAutoStood = false;
+  }
 
   if (status === 'roundover') {
     setButtons(false, false);
